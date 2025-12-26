@@ -46,6 +46,8 @@ local Config = {
     Humanize = true,
     FingerModel = true,
     SortMode = "Random",
+    SuffixMode = "",
+    LengthMode = 0,
     AutoPlay = false,
     AutoJoin = false,
     AutoJoinSettings = {
@@ -82,6 +84,8 @@ local isBlatant = Config.Blatant
 local useHumanization = Config.Humanize
 local useFingerModel = Config.FingerModel
 local sortMode = Config.SortMode
+local suffixMode = Config.SuffixMode or ""
+local lengthMode = Config.LengthMode or 0
 local autoPlay = Config.AutoPlay
 local autoJoin = Config.AutoJoin
 local panicMode = Config.PanicMode
@@ -831,6 +835,54 @@ end)
 SortBtn.TextColor3 = THEME.Accent
 SortBtn.Size = UDim2.new(0, 130, 0, 24)
 
+local SuffixBox = Instance.new("TextBox", TogglesFrame)
+SuffixBox.Size = UDim2.new(0, 130, 0, 24)
+SuffixBox.Position = UDim2.new(0, 15, 0, 235)
+SuffixBox.BackgroundColor3 = THEME.ItemBG
+SuffixBox.Font = Enum.Font.Gotham
+SuffixBox.TextSize = 11
+SuffixBox.TextColor3 = THEME.Text
+SuffixBox.PlaceholderText = "Suffix (1 char)"
+SuffixBox.PlaceholderColor3 = THEME.SubText
+SuffixBox.Text = suffixMode
+Instance.new("UICorner", SuffixBox).CornerRadius = UDim.new(0, 4)
+
+SuffixBox.FocusLost:Connect(function()
+    local text = SuffixBox.Text:lower():gsub("[%s%c]+", "")
+    if #text > 1 then text = text:sub(-1) end
+    suffixMode = text
+    SuffixBox.Text = suffixMode
+    Config.SuffixMode = suffixMode
+    SaveConfig()
+    lastDetected = "---"
+end)
+
+local LengthBox = Instance.new("TextBox", TogglesFrame)
+LengthBox.Size = UDim2.new(0, 130, 0, 24)
+LengthBox.Position = UDim2.new(0, 150, 0, 235)
+LengthBox.BackgroundColor3 = THEME.ItemBG
+LengthBox.Font = Enum.Font.Gotham
+LengthBox.TextSize = 11
+LengthBox.TextColor3 = THEME.Text
+LengthBox.PlaceholderText = "Length (e.g. 6)"
+LengthBox.PlaceholderColor3 = THEME.SubText
+LengthBox.Text = (lengthMode > 0) and tostring(lengthMode) or ""
+Instance.new("UICorner", LengthBox).CornerRadius = UDim.new(0, 4)
+
+LengthBox.FocusLost:Connect(function()
+    local n = tonumber(LengthBox.Text)
+    if n and n > 0 then
+        lengthMode = math.floor(n)
+        LengthBox.Text = tostring(lengthMode)
+    else
+        lengthMode = 0
+        LengthBox.Text = ""
+    end
+    Config.LengthMode = lengthMode
+    SaveConfig()
+    lastDetected = "---"
+end)
+
 local AutoBtn = CreateToggle("Auto Play: "..(autoPlay and "ON" or "OFF"), UDim2.new(0, 150, 0, 33), function()
     autoPlay = not autoPlay
     Config.AutoPlay = autoPlay
@@ -1061,11 +1113,21 @@ local function RefreshCustomWords()
     for i, w in ipairs(list) do
         if query == "" or w:find(query, 1, true) then
             shownCount = shownCount + 1
-            local row = Instance.new("Frame", CWScroll)
+            local row = Instance.new("TextButton", CWScroll)
             row.Size = UDim2.new(1, -6, 0, 22)
             row.BackgroundColor3 = (shownCount % 2 == 0) and Color3.fromRGB(25,25,30) or Color3.fromRGB(30,30,35)
             row.BorderSizePixel = 0
+            row.Text = ""
+            row.AutoButtonColor = false
             Instance.new("UICorner", row).CornerRadius = UDim.new(0, 4)
+            
+            row.MouseButton1Click:Connect(function()
+                SmartType(w, lastDetected, true)
+                Tween(row, {BackgroundColor3 = THEME.Accent}, 0.2)
+                task.delay(0.2, function()
+                     Tween(row, {BackgroundColor3 = (shownCount % 2 == 0) and Color3.fromRGB(25,25,30) or Color3.fromRGB(30,30,35)}, 0.2)
+                end)
+            end)
             
             local lbl = Instance.new("TextLabel", row)
             lbl.Text = w
@@ -1076,6 +1138,14 @@ local function RefreshCustomWords()
             lbl.Position = UDim2.new(0, 5, 0, 0)
             lbl.BackgroundTransparency = 1
             lbl.TextXAlignment = Enum.TextXAlignment.Left
+
+            local btn = Instance.new("TextButton", row)
+            btn.Size = UDim2.new(1, -30, 1, 0)
+            btn.BackgroundTransparency = 1
+            btn.Text = ""
+            btn.MouseButton1Click:Connect(function()
+                SmartType(w, "", true)
+            end)
             
             local del = Instance.new("TextButton", row)
             del.Text = "X"
@@ -1367,6 +1437,15 @@ do
     Instance.new("UICorner", WBEndBox).CornerRadius = UDim.new(0, 4)
     SetupPhantomBox(WBEndBox, "Ends with...")
 
+    local WBLengthBox = Instance.new("TextBox", WordBrowserFrame)
+    WBLengthBox.Font = Enum.Font.Gotham
+    WBLengthBox.TextSize = 12
+    WBLengthBox.BackgroundColor3 = THEME.ItemBG
+    WBLengthBox.Size = UDim2.new(0.2, 0, 0, 24)
+    WBLengthBox.Position = UDim2.new(0.02, 0, 0, 80)
+    Instance.new("UICorner", WBLengthBox).CornerRadius = UDim.new(0, 4)
+    SetupPhantomBox(WBLengthBox, "Len...")
+
     local WBSearchBtn = Instance.new("TextButton", WordBrowserFrame)
     WBSearchBtn.Text = "Go"
     WBSearchBtn.Font = Enum.Font.GothamBold
@@ -1377,8 +1456,8 @@ do
     Instance.new("UICorner", WBSearchBtn).CornerRadius = UDim.new(0, 4)
 
     local WBList = Instance.new("ScrollingFrame", WordBrowserFrame)
-    WBList.Size = UDim2.new(1, -20, 1, -90)
-    WBList.Position = UDim2.new(0, 10, 0, 80)
+    WBList.Size = UDim2.new(1, -20, 1, -125)
+    WBList.Position = UDim2.new(0, 10, 0, 115)
     WBList.BackgroundTransparency = 1
     WBList.ScrollBarThickness = 3
     WBList.ScrollBarImageColor3 = THEME.Accent
@@ -1390,11 +1469,12 @@ do
 
     local function SearchWords()
         for _, c in ipairs(WBList:GetChildren()) do
-            if c:IsA("Frame") then c:Destroy() end
+            if c:IsA("GuiObject") and c.Name ~= "UIListLayout" then c:Destroy() end
         end
         
         local sVal = WBStartBox.Text
         local eVal = WBEndBox.Text
+        local lVal = tonumber(WBLengthBox.Text)
         
         if sVal == "Starts with..." then sVal = "" end
         if eVal == "Ends with..." then eVal = "" end
@@ -1402,7 +1482,7 @@ do
         sVal = sVal:lower():gsub("[%s%c]+", "")
         eVal = eVal:lower():gsub("[%s%c]+", "")
         
-        if sVal == "" and eVal == "" then return end
+        if sVal == "" and eVal == "" and not lVal then return end
         
         local results = {}
         local limit = 200
@@ -1418,18 +1498,29 @@ do
         for _, w in ipairs(bucket) do
             local matchStart = (sVal == "") or (w:sub(1, #sVal) == sVal)
             local matchEnd = (eVal == "") or (w:sub(-#eVal) == eVal)
+            local matchLen = (not lVal) or (#w == lVal)
             
-            if matchStart and matchEnd then
+            if matchStart and matchEnd and matchLen then
                 table.insert(results, w)
                 if #results >= limit then break end
             end
         end
         
         for i, w in ipairs(results) do
-            local row = Instance.new("Frame", WBList)
+            local row = Instance.new("TextButton", WBList)
             row.Size = UDim2.new(1, -6, 0, 22)
             row.BackgroundColor3 = (i % 2 == 0) and Color3.fromRGB(25,25,30) or Color3.fromRGB(30,30,35)
+            row.Text = ""
+            row.AutoButtonColor = false
             Instance.new("UICorner", row).CornerRadius = UDim.new(0, 4)
+            
+            row.MouseButton1Click:Connect(function()
+                SmartType(w, lastDetected, true)
+                Tween(row, {BackgroundColor3 = THEME.Accent}, 0.2)
+                task.delay(0.2, function()
+                     Tween(row, {BackgroundColor3 = (i % 2 == 0) and Color3.fromRGB(25,25,30) or Color3.fromRGB(30,30,35)}, 0.2)
+                end)
+            end)
             
             local lbl = Instance.new("TextLabel", row)
             lbl.Text = w
@@ -1440,6 +1531,14 @@ do
             lbl.Position = UDim2.new(0, 5, 0, 0)
             lbl.BackgroundTransparency = 1
             lbl.TextXAlignment = Enum.TextXAlignment.Left
+
+            local btn = Instance.new("TextButton", row)
+            btn.Size = UDim2.new(1, 0, 1, 0)
+            btn.BackgroundTransparency = 1
+            btn.Text = ""
+            btn.MouseButton1Click:Connect(function()
+                SmartType(w, "", true)
+            end)
         end
         
         WBList.CanvasSize = UDim2.new(0,0,0, WBLayout.AbsoluteContentSize.Y)
@@ -1448,6 +1547,7 @@ do
     WBSearchBtn.MouseButton1Click:Connect(SearchWords)
     WBStartBox.FocusLost:Connect(function(enter) if enter then SearchWords() end end)
     WBEndBox.FocusLost:Connect(function(enter) if enter then SearchWords() end end)
+    WBLengthBox.FocusLost:Connect(function(enter) if enter then SearchWords() end end)
 
     WordBrowserBtn.MouseButton1Click:Connect(function()
         WordBrowserFrame.Visible = not WordBrowserFrame.Visible
@@ -1866,6 +1966,9 @@ UpdateList = function(detectedText, requiredLetter)
         if bucket then
             local checkWord = function(w)
                 if Blacklist[w] or UsedWords[w] then return end
+
+                if suffixMode ~= "" and w:sub(-#suffixMode) ~= suffixMode then return end
+                if lengthMode > 0 and #w ~= lengthMode then return end
                 
                 local mLen = GetMatchLength(w, prefix)
                 if mLen == #prefix then

@@ -145,23 +145,72 @@ end)
 
 local url = "https://raw.githubusercontent.com/skrylor/english-words/refs/heads/main/merged_english.txt"
 local fileName = "ultimate_words_v4.txt"
-local url2 = "https://raw.githubusercontent.com/skrylor/english-words/refs/heads/main/dywl%20list%20full.txt"
-local fileName2 = "dywl_list_full.txt"
 
-if not isfile(fileName) then
-    local res = request({Url = url, Method = "GET"})
-    if res and res.Body then writefile(fileName, res.Body) end
+-- Temporary Loading UI
+local LoadingGui = Instance.new("ScreenGui")
+LoadingGui.Name = "WordHelperLoading"
+local success, parent = pcall(function() return gethui() end)
+if not success or not parent then parent = game:GetService("CoreGui") end
+LoadingGui.Parent = parent
+LoadingGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+local LoadingFrame = Instance.new("Frame", LoadingGui)
+LoadingFrame.Size = UDim2.new(0, 300, 0, 100)
+LoadingFrame.Position = UDim2.new(0.5, -150, 0.4, 0)
+LoadingFrame.BackgroundColor3 = THEME.Background
+LoadingFrame.BorderSizePixel = 0
+Instance.new("UICorner", LoadingFrame).CornerRadius = UDim.new(0, 10)
+local LStroke = Instance.new("UIStroke", LoadingFrame)
+LStroke.Color = THEME.Accent
+LStroke.Transparency = 0.5
+LStroke.Thickness = 2
+
+local LoadingTitle = Instance.new("TextLabel", LoadingFrame)
+LoadingTitle.Size = UDim2.new(1, 0, 0, 40)
+LoadingTitle.BackgroundTransparency = 1
+LoadingTitle.Text = "WordHelper V4"
+LoadingTitle.TextColor3 = THEME.Accent
+LoadingTitle.Font = Enum.Font.GothamBold
+LoadingTitle.TextSize = 18
+
+local LoadingStatus = Instance.new("TextLabel", LoadingFrame)
+LoadingStatus.Size = UDim2.new(1, -20, 0, 30)
+LoadingStatus.Position = UDim2.new(0, 10, 0, 50)
+LoadingStatus.BackgroundTransparency = 1
+LoadingStatus.Text = "Initializing..."
+LoadingStatus.TextColor3 = THEME.Text
+LoadingStatus.Font = Enum.Font.Gotham
+LoadingStatus.TextSize = 14
+
+local function UpdateStatus(text, color)
+    LoadingStatus.Text = text
+    if color then LoadingStatus.TextColor3 = color end
+    game:GetService("RunService").RenderStepped:Wait()
 end
 
-if not isfile(fileName2) then
-    local res = request({Url = url2, Method = "GET"})
-    if res and res.Body then writefile(fileName2, res.Body) end
+-- Startup: Always fetch fresh word list
+local function FetchWords()
+    UpdateStatus("Fetching latest word list...", THEME.Warning)
+    local success, res = pcall(function()
+        return request({Url = url, Method = "GET"})
+    end)
+    
+    if success and res and res.Body then
+        writefile(fileName, res.Body)
+        UpdateStatus("Fetched successfully!", THEME.Success)
+    else
+        UpdateStatus("Fetch failed! Using cached.", Color3.fromRGB(255, 80, 80))
+    end
+    task.wait(0.5)
 end
+
+FetchWords()
 
 local Words = {}
 local SeenWords = {}
 
 local function LoadList(fname)
+    UpdateStatus("Parsing word list...", THEME.Warning)
     if isfile(fname) then
         local content = readfile(fname)
         for w in content:gmatch("[^\r\n]+") do
@@ -171,11 +220,16 @@ local function LoadList(fname)
                 table.insert(Words, clean)
             end
         end
+        UpdateStatus("Loaded " .. #Words .. " words!", THEME.Success)
+    else
+         UpdateStatus("No word list found!", Color3.fromRGB(255, 80, 80))
     end
+    task.wait(1)
 end
 
 LoadList(fileName)
-LoadList(fileName2)
+
+if LoadingGui then LoadingGui:Destroy() end
 
 table.sort(Words)
 Buckets = {}
